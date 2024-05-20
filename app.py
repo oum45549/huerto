@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+import subprocess
+
+# Ejecutar añadir_datos.py
+subprocess.run(["python", "añadir_datos.py"])
 
 # Cargar los datos desde el archivo CSV
 file_path = "mediciones.csv"
