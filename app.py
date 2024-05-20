@@ -40,16 +40,19 @@ opcion_visualizacion = st.selectbox("Selecciona la opción de visualización:", 
 # Obtener los datos para la opción seleccionada
 datos_visualizacion = opciones_visualizacion[opcion_visualizacion]
 
-# Formatear la fecha para el gráfico del día actual
-if opcion_visualizacion == 'Día actual':
-    datos_visualizacion['Hora'] = datos_visualizacion['Fecha'].dt.strftime('%H')
-    datos_visualizacion = datos_visualizacion.groupby('Hora').mean().reset_index()
-
 # Crear la gráfica
 st.title(f'Gráfico de {columna_seleccionada} - {opcion_visualizacion}')
 fig, ax = plt.subplots()
-ax.plot(datos_visualizacion['Hora'], datos_visualizacion[columna_seleccionada])
-ax.set_xlabel('Hora' if opcion_visualizacion == 'Día actual' else 'Fecha')
+
+# Verificar si la columna 'Hora' está presente en los datos
+if opcion_visualizacion == 'Día actual':
+    datos_visualizacion['Hora'] = datos_visualizacion['Fecha'].dt.strftime('%H:%M:%S')
+    ax.plot(datos_visualizacion['Hora'], datos_visualizacion[columna_seleccionada])
+    ax.set_xlabel('Hora')
+else:
+    ax.plot(datos_visualizacion['Fecha'], datos_visualizacion[columna_seleccionada])
+    ax.set_xlabel('Fecha')
+
 ax.set_ylabel(columna_seleccionada)
 plt.xticks(rotation=45)
 plt.tight_layout()
