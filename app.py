@@ -2,31 +2,27 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-import subprocess
 
-# Ejecutar añadir_datos.py
-subprocess.run(["python", "añadir_datos.py"]) #este .py añade los datos nuevos al CSV
+from añadir_datos import obtener_datos
 
-# Cargar los datos desde el archivo CSV
-file_path = "mediciones.csv"
-data = pd.read_csv(file_path)
+# Ejecutar la función obtener_datos para actualizar los datos y guardarlos en session_state
+obtener_datos()
 
-# Convertir la columna 'Fecha' a datetime
-data['Fecha'] = pd.to_datetime(data['Fecha'])
+df_datos_completo = st.session_state['df_datos_completo']
 
 # Excluir la columna de fecha y obtener los nombres de las columnas restantes
-nombres_columnas = [col for col in data.columns if col != 'Fecha']
+nombres_columnas = [col for col in df_datos_completo.columns if col != 'Fecha']
 
 # Opción para seleccionar qué columna graficar
 columna_seleccionada = st.selectbox("Selecciona la columna para graficar:", nombres_columnas)
 
 # Opciones de visualización
 opciones_visualizacion = {
-    'Todos los tiempos': data,
-    'Últimos 30 días': data[data['Fecha'] >= datetime.now() - timedelta(days=30)],
-    'Mes actual': data[data['Fecha'].dt.month == datetime.now().month],
-    'Últimos 7 días': data[data['Fecha'] >= datetime.now() - timedelta(days=7)],
-    'Día actual': data[data['Fecha'].dt.date == datetime.now().date()]
+    'Todos los tiempos': df_datos_completo,
+    'Últimos 30 días': df_datos_completo[df_datos_completo['Fecha'] >= datetime.now() - timedelta(days=30)],
+    'Mes actual': df_datos_completo[df_datos_completo['Fecha'].dt.month == datetime.now().month],
+    'Últimos 7 días': df_datos_completo[df_datos_completo['Fecha'] >= datetime.now() - timedelta(days=7)],
+    'Día actual': df_datos_completo[df_datos_completo['Fecha'].dt.date == datetime.now().date()]
 }
 opcion_visualizacion = st.selectbox("Selecciona la opción de visualización:", list(opciones_visualizacion.keys()))
 

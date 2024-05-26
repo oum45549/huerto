@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 from collections import defaultdict
 from dateutil import parser
+import streamlit as st
+
 
 def obtener_datos():
     try:
@@ -76,18 +78,13 @@ def obtener_datos():
         df_datos = pd.DataFrame.from_dict(datos, orient='index').reset_index()
         df_datos.rename(columns={"index": "Fecha"}, inplace=True)
         df_datos['Fecha'] = pd.to_datetime(df_datos['Fecha'])  # Convertir a datetime
-
-        # Filtrar df_datos para excluir las filas que ya están presentes en datos_csv
-        df_datos = df_datos[~df_datos['Fecha'].isin(datos_csv['Fecha'])]
+        df_datos = df_datos[~df_datos['Fecha'].isin(datos_csv['Fecha'])]# Filtrar los datos que ya están en datos_csv
         
-        # Concatenar datos nuevos con los existentes
-        updated_data = pd.concat([datos_csv, df_datos], ignore_index=True)
-        updated_data = updated_data.sort_values(by='Fecha')#para que no añadan primero los más recientes
+        #Crear un df con los datos antiguos + los nuevos
+        df_datos_completo = pd.concat([datos_csv, df_datos], ignore_index=True).sort_values(by='Fecha')
 
-        # Guardar en un archivo CSV
-        updated_data.to_csv(csv_filename, index=False, encoding='utf-8')
-        print(f"Datos almacenados en el archivo CSV: {csv_filename}")
-
+        # Guardar el DataFrame en st.session_state
+        st.session_state['df_datos_completo'] = df_datos_completo
     except Exception as e:
         print(f"Error: {e}")
 
