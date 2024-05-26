@@ -6,7 +6,6 @@ import subprocess
 
 # Ejecutar añadir_datos.py
 subprocess.run(["python", "añadir_datos.py"]) #este .py añade los datos nuevos al CSV
-subprocess.run(["python", "ordena_csv.py"])   #este .py ordena el CSV porque el anterior .py los pone de fechas más recientes a más antiguas
 
 # Cargar los datos desde el archivo CSV
 file_path = "mediciones.csv"
@@ -15,21 +14,11 @@ data = pd.read_csv(file_path)
 # Convertir la columna 'Fecha' a datetime
 data['Fecha'] = pd.to_datetime(data['Fecha'])
 
-# Traducción de los nombres de las columnas
-nombres_columnas = {
-    'Air Temperature': 'Temperatura',
-    'Air Humidity': 'Humedad',
-    'Light Intensity': 'Intensidad de Luz',
-    'Barometric Pressure': 'Presión',
-    'Wind Direction': 'Dirección del Viento',
-    'Wind Speed': 'Velocidad del Viento',
-    'Rainfall Hourly': 'Lluvia',
-    'UV Index': 'Índice UV'
-}
-data = data.rename(columns=nombres_columnas)
+# Excluir la columna de fecha y obtener los nombres de las columnas restantes
+nombres_columnas = [col for col in data.columns if col != 'Fecha']
 
 # Opción para seleccionar qué columna graficar
-columna_seleccionada = st.selectbox("Selecciona la columna para graficar:", list(nombres_columnas.values()))
+columna_seleccionada = st.selectbox("Selecciona la columna para graficar:", nombres_columnas)
 
 # Opciones de visualización
 opciones_visualizacion = {
