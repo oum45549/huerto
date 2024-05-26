@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 import subprocess
 
 # Ejecutar añadir_datos.py
-subprocess.run(["python", "añadir_datos.py"])
+subprocess.run(["python", "añadir_datos.py"]) #este .py añade los datos nuevos al CSV
+subprocess.run(["python", "ordena_csv.py"])   #este .py ordena el CSV porque el anterior .py los pone de fechas más recientes a más antiguas
 
 # Cargar los datos desde el archivo CSV
 file_path = "mediciones.csv"

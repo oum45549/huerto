@@ -1,69 +1,94 @@
+import requests
 import pandas as pd
-from datetime import datetime
-import paho.mqtt.client as mqtt
-import json
+from datetime import datetime, timedelta
+from collections import defaultdict
+from dateutil import parser
 
-# Configuración MQTT
-HOST = "sensecap-openstream.seeed.cc"
-PORT = 1883
-USERNAME = "org-434181208382464"
-PASSWORD = "6552EBDADED14014B18359DB4C3B6D4B3984D0781C2545B6A33727A4BBA1E46E"
-TOPIC = "/device_sensor_data/434181208382464/2CF7F1C04430015D/1/vs/+"
-CLIENT_ID = "org-434181208382464-7"
+def obtener_datos():
+    try:
+        # Leer el CSV existente para encontrar la última fecha de medición
+        csv_filename = "mediciones.csv"
+        try:
+            data = pd.read_csv(csv_filename)
+            data['Fecha'] = pd.to_datetime(data['Fecha'])
+            last_date = data['Fecha'].max()
+        except FileNotFoundError:
+            data = pd.DataFrame()
+            last_date = datetime.now() - timedelta(days=70)  # Si no existe el archivo, tomar datos de los últimos 70 días
+            last_date = last_date.replace(day=1)
+        
+        # Rango de fechas para obtener nuevos datos
+        fecha_actual = datetime.now()
+        timestamp_inicio = int(last_date.timestamp()) * 1000
+        timestamp_actual = int(fecha_actual.timestamp()) * 1000
 
-# Ruta al archivo CSV
-file_path = "mediciones.csv"
+        url = "https://sensecap.seeed.cc/openapi/list_telemetry_data"
+        dispositivo = '2CF7F1C04430015D'
 
-def on_message(client, userdata, message):
-    new_data = json.loads(message.payload.decode("utf-8"))
-    new_row = {
-        'Fecha': datetime.now(),
-        'Temperatura del Aire': new_data.get('temperature', None),
-        'Humedad del Aire': new_data.get('humidity', None),
-        'Intensidad de Luz': new_data.get('light', None),
-        'Presión Barométrica': new_data.get('pressure', None),
-        'Dirección del Viento': new_data.get('wind_direction', None),
-        'Velocidad del Viento': new_data.get('wind_speed', None),
-        'Lluvia Horaria': new_data.get('rainfall', None),
-        'Índice UV': new_data.get('uv', None)
-    }
-    userdata.append(new_row)
+        codigos = {
+            "4097": "Air Temperature",
+            "4098": "Air Humidity",
+            "4099": "Light Intensity",
+            "4101": "Barometric Pressure",
+            "4104": "Wind Direction",
+            "4105": "Wind Speed",
+            "4113": "Rainfall Hourly",
+            "4190": "UV Index"
+        }
 
-def fetch_new_data():
-    new_data = []
+        # Diccionario para almacenar los datos
+        datos = defaultdict(lambda: {codigo: None for codigo in codigos.values()})
 
-    client = mqtt.Client(client_id=CLIENT_ID, userdata=new_data)
-    client.username_pw_set(USERNAME, PASSWORD)
-    client.on_message = on_message
+        for codigo, nombre in codigos.items():
+            params = {
+                'device_eui': dispositivo,
+                'channel_index': 1,
+                'telemetry': codigo,
+                "time_start": str(timestamp_inicio),
+                "time_end": str(timestamp_actual)
+            }
 
-    client.connect(HOST, PORT, 60)
-    client.subscribe(TOPIC)
+            respuesta = requests.get(url, params=params, auth=('93I2S5UCP1ISEF4F', '6552EBDADED14014B18359DB4C3B6D4B3984D0781C2545B6A33727A4BBA1E46E'))
 
-    # Procesar mensajes entrantes durante un breve período de tiempo (ej. 5 segundos)
-    client.loop_start()
-    client.loop_stop()
+            if respuesta.status_code == 200:
+                datos_respuesta = respuesta.json()
 
-    return new_data
+                for mediciones in datos_respuesta["data"]["list"][1]:
+                    for medicion in mediciones:
+                        valor = medicion[0]
+                        fecha_str = medicion[1]
+                        fecha_actual_str = parser.parse(fecha_str)
+                        fecha_cercana_str = fecha_actual_str.replace(second=0)
 
-def update_csv():
-    # Leer el CSV existente
-    data = pd.read_csv(file_path)
-    data['Fecha'] = pd.to_datetime(data['Fecha'])
+                        for delta in [-30, 0, 30]:
+                            fecha_comparacion = fecha_cercana_str + timedelta(seconds=delta)
+                            fecha_comparacion_str = fecha_comparacion.strftime('%Y-%m-%d %H:%M:%S')
+                            if fecha_comparacion_str in datos:
+                                datos[fecha_comparacion_str][nombre] = valor
+                                break
+                        else:
+                            # Si no se encuentra una fecha cercana, crear una nueva fila
+                            datos[fecha_cercana_str.strftime('%Y-%m-%d %H:%M:%S')] = {nombre: valor}
 
-    # Encontrar la última fecha de medición
-    last_date = data['Fecha'].max()
+        # Convertir diccionarios a DataFrame
+        df_datos = pd.DataFrame.from_dict(datos, orient='index').reset_index()
+        df_datos.rename(columns={"index": "Fecha"}, inplace=True)
+        df_datos['Fecha'] = pd.to_datetime(df_datos['Fecha'])  # Convertir a datetime
 
-    # Obtener nuevas mediciones
-    new_data = fetch_new_data()
 
-    if new_data:
-        # Crear un DataFrame con las nuevas mediciones
-        new_df = pd.DataFrame(new_data)
-        # Filtrar datos que son posteriores a la última fecha de medición
-        new_df = new_df[new_df['Fecha'] > last_date]
-        # Añadir las nuevas mediciones al CSV existente
-        updated_data = pd.concat([data, new_df], ignore_index=True)
-        updated_data.to_csv(file_path, index=False)
+        if not data.empty:
+            # Filtrar datos que son posteriores a la última fecha de medición
+            df_datos = df_datos[df_datos['Fecha'] > last_date]
 
-if __name__ == "__main__":
-    update_csv()
+        # Concatenar datos nuevos con los existentes
+        updated_data = pd.concat([data, df_datos], ignore_index=True)
+
+        # Guardar en un archivo CSV
+        updated_data.to_csv(csv_filename, index=False)
+        print(f"Datos almacenados en el archivo CSV: {csv_filename}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Llamada a la función para obtener y guardar los datos
+obtener_datos()
